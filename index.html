@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="pt-BR"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Conferência de Mercadorias</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<style>
+:root{--bg:#f3f5f2;--card:#fff;--tx:#1d2a24;--mut:#5f6f66;--ac:#0f6b4f;--ln:#d9e0db;--er:#b3261e;--wa:#a86400}
+@media(prefers-color-scheme:dark){:root{--bg:#121a16;--card:#1b2620;--tx:#e8efe9;--mut:#9bb0a3;--ac:#4cc79a;--ln:#2d3b33;--er:#ff8a80;--wa:#ffb74d}}
+*{box-sizing:border-box}body{margin:0;font:16px/1.5 system-ui,sans-serif;background:var(--bg);color:var(--tx)}
+header{display:flex;gap:12px;align-items:center;justify-content:space-between;padding:12px 16px;background:var(--card);border-bottom:1px solid var(--ln);flex-wrap:wrap}
+nav{display:flex;gap:8px;flex-wrap:wrap}main{max-width:1000px;margin:16px auto;padding:0 12px}
+.card{background:var(--card);border:1px solid var(--ln);border-radius:8px;padding:16px;margin-bottom:16px}
+button,input,select,textarea{font:inherit;padding:12px;border-radius:6px;border:1px solid var(--ln);background:var(--card);color:var(--tx);min-height:44px}
+button{background:var(--ac);color:#fff;border:0;cursor:pointer;font-weight:600}button.sec{background:none;color:var(--tx);border:1px solid var(--ln)}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--wa)}
+form{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}label{display:grid;gap:4px;font-size:14px;color:var(--mut)}
+.full{grid-column:1/-1}.table{overflow-x:auto}table{width:100%;border-collapse:collapse}th,td{padding:8px;border-bottom:1px solid var(--ln);text-align:left;white-space:nowrap}
+.tag{padding:2px 8px;border-radius:99px;border:1px solid var(--ln);font-size:13px}.divergente{color:var(--er);border-color:var(--er)}.pendente{color:var(--wa);border-color:var(--wa)}.conferido{color:var(--ac);border-color:var(--ac)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}.kpi{border:1px solid var(--ln);border-radius:8px;padding:12px}.kpi b{display:block;font-size:22px}
+#msg{position:fixed;bottom:12px;left:50%;transform:translateX(-50%);padding:10px 16px;border-radius:6px;background:var(--tx);color:var(--bg);display:none;z-index:9}
+.hide{display:none!important}
+</style></head><body>
+<div id="msg" role="status"></div>
+<div id="login" class="card" style="max-width:380px;margin:60px auto">
+  <h2>Entrar</h2>
+  <form onsubmit="entrar(event)"><label class="full">E-mail<input id="em" type="email" required autocomplete="username"></label>
+  <label class="full">Senha<input id="pw" type="password" required autocomplete="current-password"></label>
+  <button class="full">Entrar</button><button type="button" class="sec full" onclick="recuperar()">Esqueci a senha</button></form>
+</div>
+<div id="app" class="hide">
+<header><strong id="quem"></strong><nav>
+  <button class="sec" onclick="ir('lanc')">Lançar e conferir</button>
+  <button class="sec admin hide" onclick="ir('painel')">Painel do proprietário</button>
+  <button class="sec" onclick="sair()">Sair</button></nav></header>
+<main>
+<section id="lanc">
+  <div class="card"><h3>Nova mercadoria</h3>
+  <form id="f" onsubmit="salvar(event)">
+    <label>Data da compra<input name="data_compra" type="date" required></label>
+    <label>Descrição<input name="descricao" required></label>
+    <label>Marca<input name="marca"></label>
+    <label>Fornecedor<input name="fornecedor" list="forns" required></label><datalist id="forns"></datalist>
+    <label>Quantidade<input name="quantidade" type="number" step="0.001" min="0" required></label>
+    <label>Unidade<select name="unidade"><option>un</option><option>cx</option><option>kg</option><option>L</option><option>pct</option></select></label>
+    <label>Nota fiscal<input name="nota_fiscal"></label>
+    <label>Qtd. na nota<input name="qtd_nota" type="number" step="0.001" min="0"></label>
+    <label>Qtd. recebida<input name="qtd_recebida" type="number" step="0.001" min="0"></label>
+    <label class="adm hide">Valor de compra (R$)<input name="valor_compra_unit" type="number" step="0.01" min="0"></label>
+    <label class="adm venda hide">Valor de venda (R$)<input name="valor_venda_unit" type="number" step="0.01" min="0"></label>
+    <label>Foto / nota<input name="arquivo" type="file" accept="image/*,application/pdf"></label>
+    <label class="full">Observações<textarea name="observacoes" rows="2"></textarea></label>
+    <button class="full" id="bs">Salvar lançamento</button>
+  </form></div>
+  <div class="card"><h3>Registros</h3><div class="table"><table id="tb"></table></div></div>
+</section>
+<section id="painel" class="hide">
+  <div class="card"><form onsubmit="painel(event)">
+    <label>Período<select id="per" onchange="periodo()"><option value="hoje">Hoje</option><option value="ontem">Ontem</option><option value="sem">Semana atual</option><option value="semant">Semana anterior</option><option value="mes" selected>Mês atual</option><option value="mesant">Mês anterior</option><option value="ano">Ano atual</option><option value="anoant">Ano anterior</option><option value="x">Personalizado</option></select></label>
+    <label>De<input id="ini" type="date"></label><label>Até<input id="fim" type="date"></label>
+    <button>Atualizar</button><button type="button" class="sec" onclick="csv()">Exportar CSV</button></form></div>
+  <div class="card"><div class="kpis" id="kpis"></div></div>
+  <div class="card"><h3>Compras por fornecedor</h3><div class="table"><table id="tf"></table></div>
+  <p style="color:var(--mut);font-size:14px">Receita e lucro são estimativas sobre o que foi comprado. Não representam vendas realizadas nem lucro líquido.</p></div>
+</section>
+</main></div>
+<script>
+// ===== CONFIGURE AQUI (Supabase > Project Settings > API). Use somente a chave "anon". NUNCA a service_role. =====
+const SUPABASE_URL='COLE_A_URL_DO_PROJETO', SUPABASE_ANON_KEY='COLE_A_CHAVE_ANON';
+const sb=supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
+const $=id=>document.getElementById(id), brl=v=>Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+const dt=s=>s?new Date(s).toLocaleString('pt-BR',{timeZone:'America/Bahia'}):'', dd=s=>s?s.split('-').reverse().join('/'):'';
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let eu=null,dados=[],token=crypto.randomUUID();
+function aviso(t){const m=$('msg');m.textContent=t;m.style.display='block';setTimeout(()=>m.style.display='none',4000)}
+async function entrar(e){e.preventDefault();const{error}=await sb.auth.signInWithPassword({email:$('em').value,password:$('pw').value});
+  if(error)return aviso('E-mail ou senha incorretos.');iniciar()}
+async function recuperar(){if(!$('em').value)return aviso('Digite seu e-mail primeiro.');
+  await sb.auth.resetPasswordForEmail($('em').value,{redirectTo:location.href});aviso('Se o e-mail existir, enviamos o link de recuperação.')}
+async function sair(){await sb.auth.signOut();location.reload()}
+async function iniciar(){
+  const{data:{user}}=await sb.auth.getUser();if(!user)return;
+  const{data:p}=await sb.from('perfis').select('*').eq('id',user.id).single();
+  if(!p||!p.ativo){aviso('Usuário bloqueado ou sem perfil.');return sair()}
+  eu=p;$('login').classList.add('hide');$('app').classList.remove('hide');
+  $('quem').textContent=p.nome+(p.papel==='admin'?' (proprietário)':'');
+  if(p.papel==='admin'){document.querySelectorAll('.admin,.adm').forEach(x=>x.classList.remove('hide'))}
+  periodo();await carregar();
+}
+function ir(s){$('lanc').classList.toggle('hide',s!=='lanc');$('painel').classList.toggle('hide',s!=='painel');if(s==='painel')painel()}
+async function carregar(){
+  const{data:fo}=await sb.from('fornecedores').select('id,nome').is('deleted_at',null);window.forns=fo||[];
+  $('forns').innerHTML=forns.map(f=>`<option value="${esc(f.nome)}">`).join('');
+  const{data}=await sb.from('mercadorias').select('*,fornecedores(nome),perfis!mercadorias_criado_por_fkey(nome)').is('deleted_at',null).order('criado_em',{ascending:false}).limit(200);
+  dados=data||[];let venda={};
+  if(eu.papel==='admin'){const{data:f}=await sb.from('financeiro').select('*');(f||[]).forEach(x=>venda[x.mercadoria_id]=x)}
+  else if(eu.ver_venda){const{data:v}=await sb.rpc('venda_autorizada');(v||[]).forEach(x=>venda[x.mercadoria_id]=x)}
+  const adm=eu.papel==='admin',vv=adm||eu.ver_venda;
+  $('tb').innerHTML='<tr><th>Nº</th><th>Data</th><th>Produto</th><th>Fornecedor</th><th>Qtd</th><th>Nota</th><th>Recebida</th><th>Status</th>'+(adm?'<th>Compra</th>':'')+(vv?'<th>Venda</th>':'')+'<th>Por</th><th></th></tr>'+
+  dados.map(m=>{const v=venda[m.id]||{};return`<tr><td>${m.numero}</td><td>${dd(m.data_compra)}</td><td>${esc(m.descricao)} ${esc(m.marca||'')}</td><td>${esc(m.fornecedores?.nome)}</td><td>${m.quantidade} ${m.unidade}</td><td>${m.qtd_nota??''}</td><td>${m.qtd_recebida??''}</td><td><span class="tag ${m.status}">${m.status.replace('_',' ')}</span></td>`+
+  (adm?`<td>${brl(v.valor_compra_unit)}</td>`:'')+(vv?`<td>${brl(v.valor_venda_unit)}</td>`:'')+`<td>${esc(m.perfis?.nome)}</td><td>${m.status!=='conferido'?`<button class="sec" onclick="finalizar(${m.id})">Finalizar conferência</button>`:dt(m.conferido_em)}</td></tr>`}).join('');
+}
+async function salvar(e){
+  e.preventDefault();const b=$('bs');b.disabled=true;const f=Object.fromEntries(new FormData(e.target));
+  try{
+    let fid=(forns.find(x=>x.nome.toLowerCase()===f.fornecedor.trim().toLowerCase())||{}).id;
+    if(!fid){const{data,error}=await sb.from('fornecedores').insert({nome:f.fornecedor.trim()}).select().single();if(error)throw error;fid=data.id}
+    let anexo=null;const file=e.target.arquivo.files[0];
+    if(file){anexo=`${eu.id}/${token}-${file.name.replace(/[^\w.-]/g,'_')}`;const{error}=await sb.storage.from('anexos').upload(anexo,file);if(error)throw error}
+    const n=x=>x===''||x==null?null:Number(x);
+    const div=f.qtd_nota!==''&&f.qtd_recebida!==''&&n(f.qtd_nota)!==n(f.qtd_recebida);
+    const{data:m,error}=await sb.from('mercadorias').insert({token_envio:token,data_compra:f.data_compra,descricao:f.descricao,marca:f.marca||null,fornecedor_id:fid,quantidade:n(f.quantidade),unidade:f.unidade,nota_fiscal:f.nota_fiscal||null,qtd_nota:n(f.qtd_nota),qtd_recebida:n(f.qtd_recebida),observacoes:f.observacoes||null,anexo_path:anexo,status:div?'divergente':'pendente'}).select().single();
+    if(error&&error.code==='23505')aviso('Este lançamento já foi salvo.');else if(error)throw error;
+    else{if(eu.papel==='admin')await sb.from('financeiro').insert({mercadoria_id:m.id,valor_compra_unit:n(f.valor_compra_unit)||0,valor_venda_unit:n(f.valor_venda_unit)||0});aviso('Lançamento salvo.')}
+    e.target.reset();token=crypto.randomUUID();await carregar();
+  }catch(err){aviso('Erro ao salvar: '+(err.message||err))}finally{b.disabled=false}
+}
+async function finalizar(id){
+  const m=dados.find(x=>x.id===id);const obs=prompt('Observação da conferência (opcional):',m.observacoes||'');if(obs===null)return;
+  const ok=m.qtd_nota==null||m.qtd_recebida==null||Number(m.qtd_nota)===Number(m.qtd_recebida);
+  if(!confirm(ok?'Finalizar esta conferência?':'Há divergência. Finalizar como divergente?'))return;
+  const{error}=await sb.from('mercadorias').update({status:ok?'conferido':'divergente',observacoes:obs,conferido_por:eu.id,conferido_em:new Date().toISOString()}).eq('id',id);
+  aviso(error?'Erro: '+error.message:'Conferência registrada.');carregar();
+}
+// ===== Painel do proprietário =====
+const iso=d=>d.toISOString().slice(0,10);
+function periodo(){const p=$('per').value,h=new Date(),a=h.getFullYear(),m=h.getMonth(),w=(h.getDay()+6)%7,D=(y,mo,d)=>new Date(y,mo,d,12);let i,f;
+  if(p==='hoje')i=f=h;else if(p==='ontem')i=f=D(a,m,h.getDate()-1);
+  else if(p==='sem'){i=D(a,m,h.getDate()-w);f=D(a,m,h.getDate()-w+6)}else if(p==='semant'){i=D(a,m,h.getDate()-w-7);f=D(a,m,h.getDate()-w-1)}
+  else if(p==='mes'){i=D(a,m,1);f=D(a,m+1,0)}else if(p==='mesant'){i=D(a,m-1,1);f=D(a,m,0)}
+  else if(p==='ano'){i=D(a,0,1);f=D(a,11,31)}else if(p==='anoant'){i=D(a-1,0,1);f=D(a-1,11,31)}else return;
+  $('ini').value=iso(i);$('fim').value=iso(f)}
+let ult=null;
+async function painel(e){if(e)e.preventDefault();if(eu.papel!=='admin')return;
+  const{data,error}=await sb.rpc('resumo',{p_ini:$('ini').value,p_fim:$('fim').value});if(error)return aviso(error.message);ult=data;
+  const marg=data.receita_potencial>0?(data.lucro_potencial/data.receita_potencial*100):0;
+  const k=[['Compras registradas',data.compras],['Itens comprados',data.itens],['Custo total',brl(data.custo)],['Valor médio por compra',brl(data.compras?data.custo/data.compras:0)],['Receita potencial (estimada)',brl(data.receita_potencial)],['Lucro bruto potencial (estimado)',brl(data.lucro_potencial)],['Margem bruta estimada',marg.toFixed(1).replace('.',',')+'%'],['Com divergência',data.divergentes]];
+  $('kpis').innerHTML=k.map(x=>`<div class="kpi">${x[0]}<b>${x[1]}</b></div>`).join('');
+  $('tf').innerHTML='<tr><th>Fornecedor</th><th>Total comprado</th></tr>'+data.por_fornecedor.map(x=>`<tr><td>${esc(x.nome||'(sem fornecedor)')}</td><td>${brl(x.total)}</td></tr>`).join('')}
+function csv(){if(!ult)return aviso('Atualize o painel primeiro.');
+  const l=[['Fornecedor','Total comprado'],...ult.por_fornecedor.map(x=>[x.nome||'',String(x.total).replace('.',',')])];
+  const b=new Blob(['\ufeff'+l.map(r=>r.map(c=>`"${c}"`).join(';')).join('\n')],{type:'text/csv'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=`compras_${$('ini').value}_${$('fim').value}.csv`;a.click()}
+sb.auth.getSession().then(({data})=>{if(data.session)iniciar()});
+</script></body></html>
