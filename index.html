@@ -65,7 +65,7 @@ form{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1
 </main></div>
 <script>
 // ===== CONFIGURE AQUI (Supabase > Project Settings > API). Use somente a chave "anon". NUNCA a service_role. =====
-const SUPABASE_URL='COLE_A_URL_DO_PROJETO', SUPABASE_ANON_KEY='COLE_A_CHAVE_ANON';
+const SUPABASE_URL='COLE_A_URL_DO_PROJETO', SUPABASE_ANON_KEY='https://fpkjtchmrjqlrsguliwh.supabase.co';
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
 const $=id=>document.getElementById(id), brl=v=>Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
 const dt=s=>s?new Date(s).toLocaleString('pt-BR',{timeZone:'America/Bahia'}):'', dd=s=>s?s.split('-').reverse().join('/'):'';
